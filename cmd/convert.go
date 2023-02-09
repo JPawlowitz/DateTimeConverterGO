@@ -4,7 +4,10 @@ import (
 	"encoding/csv"
 	"fmt"
 	"github.com/spf13/cobra"
+	"io"
+	"log"
 	"os"
+	"strings"
 )
 
 var description = `Konvertiert eine oder mehrere Dateien bei angegebenem Pfad.
@@ -23,18 +26,79 @@ var convertCmd = &cobra.Command{
 }
 
 func handleConversion(cmd *cobra.Command, args []string) {
-	fmt.Println("Arguments: " + args[0])
+	filePath := &args[0]
 
-	file, err := os.Open(args[0])
+	file, err := os.Open(*filePath)
 	if err != nil {
 		fmt.Println("Pfad kann nicht gefunden werden!")
 		return
 	}
 
-	defer file.Close()
+	defer func(file *os.File) {
+		err = file.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(file)
 
 	csvReader := csv.NewReader(file)
-	data, err := csvReader.ReadAll()
+	csvReader.Comma = ';'
 
-	fmt.Println(data)
+	conversionFileName := strings.Split(*filePath, ".")
+	conversionFile, err := os.Create(conversionFileName[0] + "_CONVERTED" + ".csv")
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	defer func(conversionFile *os.File) {
+		err := conversionFile.Close()
+		if err != nil {
+
+		}
+	}(conversionFile)
+
+	var convertedDate string
+
+	for {
+		record, err := csvReader.Read()
+		if err == io.EOF {
+			break
+		}
+
+		convertedDate = parseDateISO(&record[0])
+		record[0] = convertedDate
+		_, err = conversionFile.WriteString(rebuildRecord(&record))
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+}
+
+func parseDateISO(oldDate *string) string {
+	split := strings.Split(*oldDate, "-")
+	yearMonthDay := strings.ReplaceAll(split[0], ".", "-")
+
+	builder := strings.Builder{}
+
+	builder.WriteString(yearMonthDay)
+	builder.WriteString("T")
+	builder.WriteString(split[1])
+
+	return builder.String()
+}
+
+func rebuildRecord(lines *[]string) string {
+	builder := strings.Builder{}
+
+	for i, line := range *lines {
+		builder.WriteString(line)
+
+		if i < len(*lines)-1 {
+			builder.WriteString(";")
+		}
+	}
+
+	builder.WriteString("\n")
+
+	return builder.String()
 }
