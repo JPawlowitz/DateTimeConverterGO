@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/spf13/cobra"
 	"io"
-	"log"
 	"os"
 	"strings"
 )
@@ -15,7 +14,9 @@ Konversion einzelner Datei:
 DateTimeConverterGO convert D:\Verzeichnis\test.csv
 
 Konversion aller Dateien eines Ordners:
-DateTimeConverterGO convert D:\Verzeichnis\`
+DateTimeConverterGO convert -dir D:\Verzeichnis\`
+
+var convertDir bool
 
 var convertCmd = &cobra.Command{
 	Use:   "convert",
@@ -26,20 +27,54 @@ var convertCmd = &cobra.Command{
 }
 
 func handleConversion(cmd *cobra.Command, args []string) {
-	filePath := &args[0]
+	path := &args[0]
 
-	file, err := os.Open(*filePath)
+	if convertDir {
+		handleConvertDirectory(path)
+	} else {
+		handleConvertFile(path)
+	}
+
+	fmt.Println("Konversion erfolgreich!")
+}
+
+func handleConvertDirectory(dirPath *string) {
+	dir, err := os.Open(*dirPath)
 	if err != nil {
-		fmt.Println("Pfad kann nicht gefunden werden!")
+		fmt.Println("Ordner kann nicht gefunden werden")
 		return
 	}
 
-	defer func(file *os.File) {
-		err = file.Close()
-		if err != nil {
-			log.Fatal(err)
+	defer dir.Close()
+
+	dirFiles, err := dir.ReadDir(0)
+	if err != nil {
+		return
+	}
+
+	for _, file := range dirFiles {
+		if !file.IsDir() {
+			split := strings.Split(file.Name(), ".")
+
+			if len(split) == 2 && split[1] == "csv" {
+				filePath := *dirPath + file.Name()
+
+				handleConvertFile(&filePath)
+			}
 		}
-	}(file)
+	}
+}
+
+func handleConvertFile(filePath *string) {
+	file, err := os.Open(*filePath)
+	if err != nil {
+		fmt.Println("Datei kann nicht gefunden werden!")
+		return
+	}
+
+	fmt.Println("Konvertiere Datei ", *filePath)
+
+	defer file.Close()
 
 	csvReader := csv.NewReader(file)
 	csvReader.Comma = ';'
@@ -50,12 +85,7 @@ func handleConversion(cmd *cobra.Command, args []string) {
 		fmt.Println(err)
 	}
 
-	defer func(conversionFile *os.File) {
-		err := conversionFile.Close()
-		if err != nil {
-
-		}
-	}(conversionFile)
+	defer conversionFile.Close()
 
 	var convertedDate string
 

@@ -24,6 +24,7 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	convertCmd.Flags().BoolVar(&convertDir, "dir", false, "Konvertiert gesamtes Verzeichnis")
+
 	rootCmd.AddCommand(convertCmd)
 }
